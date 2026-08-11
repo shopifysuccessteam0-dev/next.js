@@ -21,6 +21,16 @@ declare global {
   var __turbopack_server_hmr_handlers__:
     | Map<string, { handler: (update: any) => void; chunkPrefix: string }>
     | undefined
+  /**
+   * Installed by a host that compiles chunks on demand. It is called with the
+   * path of a chunk that is about to be required for the first time, and must
+   * resolve once that chunk and everything it lists exist on disk in their
+   * final form. The host is also responsible for evicting the chunk from
+   * `require.cache` if it rewrote a file that was already required.
+   */
+  var __turbopack_ensure_chunk__:
+    | ((chunkPath: string) => void | Promise<void>)
+    | undefined
 }
 
 export {}

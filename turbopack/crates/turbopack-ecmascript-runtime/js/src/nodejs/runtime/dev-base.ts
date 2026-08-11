@@ -39,6 +39,38 @@ nodeDevContextPrototype.R = resolvePathFromModule
 nodeDevContextPrototype.C = clearChunkCache
 
 /**
+ * Chunks the host is currently compiling on demand, so that concurrent loads of
+ * the same chunk only ask for it once.
+ */
+const chunksBeingEnsured = new Map<ChunkPath, Promise<void>>()
+
+/**
+ * Loads a chunk, giving a host that compiles chunks on demand the chance to
+ * produce it first. Chunks that were already loaded are never announced again,
+ * so the host only sees the first load of each chunk.
+ */
+function loadChunkAsyncOnDemand<TModule extends Module>(
+  this: TurbopackBaseContext<TModule>,
+  chunkData: ChunkData
+): Promise<void> {
+  const ensureChunk = globalThis.__turbopack_ensure_chunk__
+  const chunkPath = typeof chunkData === 'string' ? chunkData : chunkData.path
+  if (ensureChunk === undefined || chunkCache.has(chunkPath)) {
+    return loadChunkAsync.call(this, chunkData)
+  }
+
+  let ensured = chunksBeingEnsured.get(chunkPath)
+  if (ensured === undefined) {
+    ensured = Promise.resolve(ensureChunk(chunkPath)).finally(() => {
+      chunksBeingEnsured.delete(chunkPath)
+    })
+    chunksBeingEnsured.set(chunkPath, ensured)
+  }
+  return ensured.then(() => loadChunkAsync.call(this, chunkData))
+}
+nodeDevContextPrototype.l = loadChunkAsyncOnDemand
+
+/**
  * Instantiates a module in development mode using shared HMR logic.
  */
 function instantiateModule(

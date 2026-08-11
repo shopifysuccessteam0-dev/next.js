@@ -10,8 +10,11 @@ import { getRedboxSource, retry, waitForRedbox } from 'next-test-utils'
       patchFileDelay: 500,
     })
 
-    async function assetsContaining(marker: string): Promise<string[]> {
-      const root = path.join(next.testDir, next.distDir, 'static')
+    async function assetsContaining(
+      marker: string,
+      dir: 'static' | 'server' = 'static'
+    ): Promise<string[]> {
+      const root = path.join(next.testDir, next.distDir, dir)
       const matches: string[] = []
 
       async function walk(dir: string) {
@@ -99,6 +102,11 @@ import { getRedboxSource, retry, waitForRedbox } from 'next-test-utils'
       expect(await assetsContaining('lazy-marker-9a4e')).toHaveLength(0)
       expect(await assetsContaining('color: green')).toHaveLength(0)
       expect(await assetsContaining('untouched-marker-2d8c')).toHaveLength(0)
+      // The SSR graph of the page does not compile it either, even though the page rendered.
+      expect(await assetsContaining('lazy-marker-9a4e', 'server')).toHaveLength(
+        0
+      )
+
       // A valid-looking activation path that no lazy proxy owns falls through to the static handler.
       expect(
         await next
@@ -321,6 +329,36 @@ export const invalid = ;`
           (pathname) => !manifestsAfterFirst.includes(pathname)
         )
       ).toHaveLength(1)
+    })
+
+    it('activates a dynamic import that is reached while rendering on the server', async () => {
+      const hostPath = path.join('app', 'ssr-dynamic', 'host.tsx')
+      const originalHost = await next.readFile(hostPath)
+
+      // The import is only reached by the server render, so the browser never asks for the
+      // target and it stays out of the client output.
+      expect(await next.render('/ssr-dynamic')).toContain(
+        'ssr-lazy-marker-4f31'
+      )
+      expect(
+        await assetsContaining('ssr-lazy-marker-4f31', 'server')
+      ).not.toHaveLength(0)
+      expect(await assetsContaining('ssr-lazy-marker-4f31')).toHaveLength(0)
+
+      // Editing the importer recompiles it without losing the activation.
+      try {
+        await next.patchFile(
+          hostPath,
+          originalHost.replace('<SsrTarget />', '<SsrTarget key="edited" />')
+        )
+        await retry(async () => {
+          expect(await next.render('/ssr-dynamic')).toContain(
+            'ssr-lazy-marker-4f31'
+          )
+        })
+      } finally {
+        await next.patchFile(hostPath, originalHost)
+      }
     })
   }
 )
