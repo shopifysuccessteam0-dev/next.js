@@ -1,9 +1,9 @@
 'use client'
 
-import dynamic from 'next/dynamic'
+import { lazy } from 'react'
 
-const SsrTarget = dynamic(() => import('./ssr-target'))
+const SsrTarget = lazy(() => import('./ssr-target'))
 
-export function Host() {
-  return <SsrTarget />
+export function Host({ show }: { show: boolean }) {
+  return show ? <SsrTarget /> : <p id="ssr-idle">SSR target not rendered</p>
 }

@@ -333,11 +333,27 @@ export const invalid = ;`
 
     it('activates a dynamic import that is reached while rendering on the server', async () => {
       const hostPath = path.join('app', 'ssr-dynamic', 'host.tsx')
+      const targetPath = path.join('app', 'ssr-dynamic', 'ssr-target.tsx')
       const originalHost = await next.readFile(hostPath)
+      const originalTarget = await next.readFile(targetPath)
 
-      // The import is only reached by the server render, so the browser never asks for the
-      // target and it stays out of the client output.
-      expect(await next.render('/ssr-dynamic')).toContain(
+      try {
+        await next.patchFile(
+          targetPath,
+          `${originalTarget}\nexport const invalid = ;`
+        )
+        // Compiling and rendering the importer does not parse the target until the dynamic
+        // component is actually rendered.
+        expect(await next.render('/ssr-dynamic')).toContain(
+          'SSR target not rendered'
+        )
+      } finally {
+        await next.patchFile(targetPath, originalTarget)
+      }
+
+      // The import is reached by the server render, so the Node.js runtime activates it without
+      // the browser requesting the target.
+      expect(await next.render('/ssr-dynamic?show=1')).toContain(
         'ssr-lazy-marker-4f31'
       )
       expect(
@@ -352,7 +368,7 @@ export const invalid = ;`
           originalHost.replace('<SsrTarget />', '<SsrTarget key="edited" />')
         )
         await retry(async () => {
-          expect(await next.render('/ssr-dynamic')).toContain(
+          expect(await next.render('/ssr-dynamic?show=1')).toContain(
             'ssr-lazy-marker-4f31'
           )
         })
