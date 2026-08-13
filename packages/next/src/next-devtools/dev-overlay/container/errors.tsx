@@ -997,10 +997,12 @@ export function Errors({
           )
           break
         case 'dynamic':
-          ;<>
-            Next.js encountered uncached data in <code>generateMetadata()</code>
-            .
-          </>
+          errorMessage = (
+            <>
+              Next.js encountered uncached data in{' '}
+              <code>generateMetadata()</code>.
+            </>
+          )
           break
       }
       return (
