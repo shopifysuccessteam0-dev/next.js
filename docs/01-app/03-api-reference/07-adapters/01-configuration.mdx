@@ -1,17 +1,434 @@
----
-title: Configuration
-description: Configure `adapterPath` or `NEXT_ADAPTER_PATH` to use a custom deployment adapter.
----
+'use client';
 
-To use an adapter, specify the path to your adapter module in `adapterPath`:
+import React, { useState, useEffect } from 'react';
+import { 
+  Mail, Users, FolderKanban, FileText, BarChart3, Settings, 
+  Search, ShieldCheck, Zap, ArrowRight, ExternalLink, Menu, Sun, Moon, Sparkles, Send
+} from 'lucide-react';
 
-```js filename="next.config.js"
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  adapterPath: require.resolve('./my-adapter.js'),
+// --- TYPES ---
+type ViewMode = 'landing' | 'login' | 'signup' | 'dashboard' | 'scout' | 'prospects' | 'campaigns' | 'templates' | 'tools' | 'settings';
+
+interface Prospect {
+  id: string;
+  email: string;
+  name: string;
+  company: string;
+  status: 'valid' | 'invalid';
+  source: string;
 }
 
-module.exports = nextConfig
-```
+interface Template {
+  id: string;
+  name: string;
+  subject: string;
+  message: string;
+  category: string;
+}
 
-Alternatively `NEXT_ADAPTER_PATH` can be set to enable zero-config usage in deployment platforms.
+interface Campaign {
+  id: string;
+  name: string;
+  prospectCount: number;
+  status: 'Draft' | 'Ready' | 'Completed';
+  date: string;
+}
+
+export default function AdelightScoutierApp() {
+  const [view, setView] = useState<ViewMode>('landing');
+  const [darkMode, setDarkMode] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Default Prospects including demo leads
+  const [prospects, setProspects] = useState<Prospect[]>([
+    { id: '1', email: 'john@acme.com', name: 'John Smith', company: 'Acme Digital', status: 'valid', source: 'Demo' },
+    { id: '2', email: 'sarah@novaagency.com', name: 'Sarah Williams', company: 'Nova Agency', status: 'valid', source: 'Demo' },
+    { id: '3', email: 'michael@brightsolutions.com', name: 'Michael Brown', company: 'Bright Solutions', status: 'valid', source: 'Demo' },
+  ]);
+
+  // Cold Outreach Templates
+  const [templates, setTemplates] = useState<Template[]>([
+    { 
+      id: '1', 
+      name: 'Cold Outreach - Sales & Growth', 
+      subject: 'Quick question regarding {company}\'s outreach', 
+      message: 'Hi {name},\n\nI came across {company} and wanted to connect. We help teams scale their outreach without spending hours copying emails manually.\n\nWould you be open to a quick 5-minute chat this week?\n\nBest,\nAdelight', 
+      category: 'Sales' 
+    },
+    { 
+      id: '2', 
+      name: 'Cold Partnership Inquiry', 
+      subject: 'Partnership idea for {company}', 
+      message: 'Hello {name},\n\nLove the work you are doing at {company}. I had an idea on how we could collaborate to bring mutual value to our audiences.\n\nBest,\nAdelight', 
+      category: 'Partnership' 
+    }
+  ]);
+
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('1');
+  const [campaigns, setCampaigns] = useState<Campaign[]>([
+    { id: '1', name: 'Q3 Cold Outreach Batch', prospectCount: 3, status: 'Ready', date: '2026-08-13' }
+  ]);
+
+  const [rawText, setRawText] = useState('');
+  const [extractedLogs, setExtractedLogs] = useState<string>('');
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
+  // Extraction Engine
+  const handleExtractAndValidate = () => {
+    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi;
+    const matches = rawText.match(emailRegex) || [];
+    const uniqueEmails = Array.from(new Set(matches));
+
+    const newProspects: Prospect[] = uniqueEmails.map((email, idx) => {
+      const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const localPart = email.split('@')[0];
+      const name = localPart.charAt(0).toUpperCase() + localPart.slice(1);
+      const company = email.split('@')[1]?.split('.')[0] || 'Unknown';
+
+      return {
+        id: Date.now().toString() + idx,
+        email,
+        name: isValid ? name : '',
+        company: isValid ? company.charAt(0).toUpperCase() + company.slice(1) : '',
+        status: isValid ? 'valid' : 'invalid',
+        source: 'Pasted Input'
+      };
+    });
+
+    setProspects([...prospects, ...newProspects]);
+    setExtractedLogs(`Successfully extracted and validated ${uniqueEmails.length} emails!`);
+    setRawText('');
+  };
+
+  const activeTemplateObj = templates.find(t => t.id === selectedTemplate) || templates[0];
+
+  // --- RENDER VIEWS ---
+  if (view === 'landing') {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="flex items-center gap-2">
+            <div className="bg-indigo-600 text-white p-2 rounded-xl font-bold">AS</div>
+            <span className="text-xl font-extrabold tracking-tight">Adelight Scoutier</span>
+          </div>
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
+            <button onClick={() => setView('landing')} className="hover:text-indigo-600">Home</button>
+            <button onClick={() => setView('login')} className="hover:text-indigo-600">Login</button>
+            <button onClick={() => setView('signup')} className="bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition">Start Scouting Free</button>
+          </div>
+        </header>
+
+        <section className="py-20 px-6 text-center max-w-4xl mx-auto">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 mb-6">
+            <Sparkles className="w-3.5 h-3.5" /> 100% Free Core Version
+          </span>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight mb-6">
+            Scout Smarter. Personalize Faster. <span className="text-indigo-600">Reach More People.</span>
+          </h1>
+          <p className="text-lg text-slate-600 dark:text-slate-400 mb-8 max-w-2xl mx-auto">
+            Adelight Scoutier helps freelancers, agencies, recruiters and businesses organize prospects, personalize cold outreach emails and prepare campaigns faster.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <button onClick={() => setView('signup')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+              Start Cold Scouting Free <ArrowRight className="w-4 h-4" />
+            </button>
+            <button onClick={() => setView('dashboard')} className="border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 font-medium px-6 py-3.5 rounded-xl transition">
+              Explore Dashboard Demo
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (view === 'login' || view === 'signup') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 px-4">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl">
+          <div className="text-center mb-6">
+            <div className="bg-indigo-600 text-white w-12 h-12 mx-auto rounded-2xl flex items-center justify-center font-bold text-xl mb-3">AS</div>
+            <h2 className="text-2xl font-bold">{view === 'login' ? 'Welcome Back' : 'Create Free Account'}</h2>
+            <p className="text-sm text-slate-500">Smart Cold Email Scouting & Outreach</p>
+          </div>
+          <div className="space-y-4">
+            {view === 'signup' && (
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Full Name</label>
+                <input type="text" placeholder="John Doe" className="w-full mt-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent" />
+              </div>
+            )}
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase">Email Address</label>
+              <input type="email" placeholder="you@example.com" className="w-full mt-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase">Password</label>
+              <input type="password" placeholder="••••••••" className="w-full mt-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent" />
+            </div>
+            <button onClick={() => setView('dashboard')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl transition">
+              {view === 'login' ? 'Secure Login' : 'Create Account Free'}
+            </button>
+            <div className="text-center text-sm text-slate-500">
+              {view === 'login' ? (
+                <p>Don&apos;t have an account? <button onClick={() => setView('signup')} className="text-indigo-600 font-medium">Sign up</button></p>
+              ) : (
+                <p>Already have an account? <button onClick={() => setView('login')} className="text-indigo-600 font-medium">Log in</button></p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
+      {/* Sidebar */}
+      <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hidden md:flex flex-col justify-between p-4">
+        <div>
+          <div className="flex items-center gap-2 px-2 py-3 mb-6">
+            <div className="bg-indigo-600 text-white p-2 rounded-xl font-bold">AS</div>
+            <span className="font-extrabold tracking-tight">Scoutier</span>
+          </div>
+          <nav className="space-y-1">
+            <SidebarItem icon={<BarChart3 />} label="Dashboard" active={view === 'dashboard'} onClick={() => setView('dashboard')} />
+            <SidebarItem icon={<Search />} label="Scout Prospects" active={view === 'scout'} onClick={() => setView('scout')} />
+            <SidebarItem icon={<Users />} label="Prospects" active={view === 'prospects'} onClick={() => setView('prospects')} />
+            <SidebarItem icon={<FolderKanban />} label="Cold Campaigns" active={view === 'campaigns'} onClick={() => setView('campaigns')} />
+            <SidebarItem icon={<FileText />} label="Templates" active={view === 'templates'} onClick={() => setView('templates')} />
+            <SidebarItem icon={<Settings />} label="Settings" active={view === 'settings'} onClick={() => setView('settings')} />
+          </nav>
+        </div>
+        <div className="p-3 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl border border-indigo-100 dark:border-indigo-900">
+          <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">Free Access Version</p>
+          <p className="text-xs text-slate-500 mt-1">Cold outreach & mailto generation unlocked.</p>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-6 sticky top-0 z-40">
+          <div className="flex items-center gap-3">
+            <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              <Menu className="w-6 h-6" />
+            </button>
+            <h1 className="font-bold capitalize">{view === 'campaigns' ? 'Cold Outreach Campaigns' : view}</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+              {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-600" />}
+            </button>
+            <button onClick={() => setView('landing')} className="text-sm font-medium text-rose-600 hover:underline">Logout</button>
+          </div>
+        </header>
+
+        <main className="flex-1 p-6 overflow-y-auto">
+          {view === 'dashboard' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard title="Total Prospects" value={prospects.length.toString()} icon={<Users />} />
+                <StatCard title="Valid Leads" value={prospects.filter(p => p.status === 'valid').length.toString()} icon={<ShieldCheck />} />
+                <StatCard title="Cold Campaigns" value={campaigns.length.toString()} icon={<FolderKanban />} />
+                <StatCard title="Templates" value={templates.length.toString()} icon={<FileText />} />
+              </div>
+
+              {/* Cold Campaign Quick Launcher Widget */}
+              <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                  <span className="bg-indigo-500/30 text-indigo-300 text-xs font-semibold px-3 py-1 rounded-full">Cold Outreach Studio</span>
+                  <h3 className="text-2xl font-black mt-2">Ready to launch your cold email batch?</h3>
+                  <p className="text-slate-300 text-sm mt-1">Select your cold template, customize variables, and open personalized client drafts instantly.</p>
+                </div>
+                <button onClick={() => setView('campaigns')} className="bg-white text-indigo-950 font-bold px-6 py-3 rounded-xl hover:bg-indigo-50 transition shrink-0 flex items-center gap-2">
+                  <Send className="w-4 h-4 text-indigo-600" /> Open Cold Campaigns
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view === 'scout' && (
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl">
+                <h3 className="font-bold text-lg mb-2">Extract & Validate Prospects</h3>
+                <p className="text-sm text-slate-500 mb-4">Paste messy email lists or text blocks below. Scoutier will automatically clean and structure your leads for cold outreach.</p>
+                <textarea 
+                  rows={6}
+                  value={rawText}
+                  onChange={(e) => setRawText(e.target.value)}
+                  placeholder="Paste text here (e.g., Contact John at john@acme.com, Sarah - sarah@novaagency.com)..." 
+                  className="w-full p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent text-sm mb-4"
+                />
+                <button onClick={handleExtractAndValidate} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-3 rounded-xl transition flex items-center gap-2">
+                  <Zap className="w-4 h-4" /> Extract & Clean Emails
+                </button>
+                {extractedLogs && <p className="text-sm font-medium text-emerald-600 mt-3">{extractedLogs}</p>}
+              </div>
+            </div>
+          )}
+
+          {view === 'prospects' && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <h3 className="font-bold">Prospect Database ({prospects.length})</h3>
+                <button onClick={() => setView('scout')} className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-xl">Add Prospects</button>
+              </div>
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="p-4">Name</th>
+                    <th className="p-4">Email</th>
+                    <th className="p-4">Company</th>
+                    <th className="p-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                  {prospects.map(p => (
+                    <tr key={p.id}>
+                      <td className="p-4 font-medium">{p.name || '—'}</td>
+                      <td className="p-4 text-indigo-600">{p.email}</td>
+                      <td className="p-4">{p.company || '—'}</td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded-md text-xs font-semibold ${p.status === 'valid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                          {p.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {view === 'templates' && (
+            <div className="space-y-4">
+              <h3 className="font-bold text-lg">Cold Outreach Templates</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {templates.map(t => (
+                  <div key={t.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600">{t.category}</span>
+                      <span className="font-bold text-sm">{t.name}</span>
+                    </div>
+                    <p className="text-sm font-medium">Subject: {t.subject}</p>
+                    <pre className="text-xs text-slate-500 whitespace-pre-wrap font-sans bg-slate-50 dark:bg-slate-800 p-3 rounded-xl">{t.message}</pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* COLD CAMPAIGNS & MAILTO GENERATOR */}
+          {view === 'campaigns' && (
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-4">
+                <h3 className="font-bold text-lg">Cold Campaign Generator</h3>
+                <p className="text-sm text-slate-500">Choose a cold template below. Variables like <code className="text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-1 py-0.5 rounded">&#123;name&#125;</code> and <code className="text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-1 py-0.5 rounded">&#123;company&#125;</code> will automatically adapt for each prospect.</p>
+                
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Template</label>
+                  <select 
+                    value={selectedTemplate} 
+                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                    className="w-full mt-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent text-sm font-medium"
+                  >
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id} className="dark:bg-slate-900">{t.name} — ({t.category})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-bold text-md">Personalized Cold Drafts ({prospects.filter(p => p.status === 'valid').length} Ready)</h4>
+                {prospects.filter(p => p.status === 'valid').map(p => {
+                  // Replace variables
+                  const sub = activeTemplateObj.subject
+                    .replace(/\{name\}/gi, p.name)
+                    .replace(/\{company\}/gi, p.company);
+
+                  const msg = activeTemplateObj.message
+                    .replace(/\{name\}/gi, p.name)
+                    .replace(/\{company\}/gi, p.company)
+                    .replace(/\{email\}/gi, p.email);
+
+                  const mailtoLink = `mailto:${p.email}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(msg)}`;
+
+                  return (
+                    <div key={p.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-4">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-100 dark:border-slate-800 gap-2">
+                        <div>
+                          <p className="font-bold">{p.name} <span className="text-xs font-normal text-slate-500">({p.company})</span></p>
+                          <p className="text-xs text-indigo-600 font-medium">{p.email}</p>
+                        </div>
+                        <a 
+                          href={mailtoLink} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> Open Cold Email in Client
+                        </a>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Subject: <span className="text-slate-900 dark:text-slate-100 font-normal normal-case">{sub}</span></p>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap font-sans">
+                          {msg}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {view === 'settings' && (
+            <div className="max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-4">
+              <h3 className="font-bold text-lg">Account Settings</h3>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Your Name</label>
+                <input type="text" defaultValue="Adelight User" className="w-full mt-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Email Address</label>
+                <input type="email" defaultValue="user@adelight.com" className="w-full mt-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent text-sm" />
+              </div>
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs rounded-xl font-medium">
+                Adelight Scoutier is running in Free Access Mode. All cold campaign features are fully unlocked.
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function SidebarItem({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${active ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+      {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4' })}
+      {label}
+    </button>
+  );
+}
+
+function StatCard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-xs font-semibold text-slate-500">{title}</span>
+        <div className="p-2 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 rounded-xl">{icon}</div>
+      </div>
+      <p className="text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
